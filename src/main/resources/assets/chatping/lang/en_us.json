@@ -1,0 +1,24 @@
+{
+	"key.chatping.place_ping": "Place Ping",
+	"category.chatping": "Chat Ping",
+	"text.autoconfig.chatping.title": "Chat Ping Settings",
+	"text.autoconfig.chatping.category.general": "General",
+	"text.autoconfig.chatping.category.players": "Player Colors",
+
+	"text.autoconfig.chatping.option.general": "General",
+	"text.autoconfig.chatping.option.general.raycastDistance": "Raycast distance (blocks)",
+	"text.autoconfig.chatping.option.general.markerLifetimeSeconds": "Marker lifetime (seconds)",
+	"text.autoconfig.chatping.option.general.pingCooldownMillis": "Ping cooldown (ms)",
+	"text.autoconfig.chatping.option.general.hidePingChatLine": "Hide raw ping chat line",
+	"text.autoconfig.chatping.option.general.showDistanceInLabel": "Show distance in label",
+	"text.autoconfig.chatping.option.general.markerColor": "Marker color",
+	"text.autoconfig.chatping.option.general.dotSizePercent": "Dot thickness (%)",
+	"text.autoconfig.chatping.option.general.labelScalePercent": "Label text size (%)",
+	"text.autoconfig.chatping.option.general.renderMode": "Marker style",
+
+	"text.autoconfig.chatping.option.players": "Player Colors",
+	"text.autoconfig.chatping.option.players.entries": "Per-player colors",
+	"text.autoconfig.chatping.option.Entry": "Player",
+	"text.autoconfig.chatping.option.Entry.playerName": "Player name",
+	"text.autoconfig.chatping.option.Entry.color": "Color"
+}
