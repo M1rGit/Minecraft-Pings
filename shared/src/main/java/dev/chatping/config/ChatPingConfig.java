@@ -32,8 +32,22 @@ public class ChatPingConfig implements ConfigData {
 	@ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
 	public RenderMode renderMode = RenderMode.BEAM_AND_DOT;
 
+	@ConfigEntry.Gui.EnumHandler(option = ConfigEntry.Gui.EnumHandler.EnumDisplayOption.BUTTON)
+	public TransportMode transportMode = TransportMode.CHAT_ONLY;
+
+	public String relayServerUrl = "ws://localhost:8080";
+
 	public enum RenderMode {
 		DOT_ONLY,
 		BEAM_AND_DOT
+	}
+
+	public enum TransportMode {
+		/** Default, unchanged behaviour — send through vanilla chat, encoded per {@link dev.chatping.ping.PingCodec}. */
+		CHAT_ONLY,
+		/** Only the WebSocket relay — never touches chat, so it can't trip a server's spam/mute filter. */
+		RELAY_ONLY,
+		/** Relay when connected, chat if it isn't — trades the mute-proof guarantee for "always gets there somehow". */
+		RELAY_PREFERRED_CHAT_FALLBACK
 	}
 }

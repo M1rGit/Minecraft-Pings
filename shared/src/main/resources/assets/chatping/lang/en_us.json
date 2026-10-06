@@ -17,6 +17,8 @@
 	"text.autoconfig.chatping.option.general.dotSizePercent": "Dot thickness (%)",
 	"text.autoconfig.chatping.option.general.labelScalePercent": "Label text size (%)",
 	"text.autoconfig.chatping.option.general.renderMode": "Marker style",
+	"text.autoconfig.chatping.option.general.transportMode": "Ping transport",
+	"text.autoconfig.chatping.option.general.relayServerUrl": "Relay server URL (ws://host:port)",
 
 	"text.autoconfig.chatping.option.players": "Player Colors",
 	"text.autoconfig.chatping.option.players.entries": "Per-player colors",

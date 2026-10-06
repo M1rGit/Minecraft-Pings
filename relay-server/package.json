@@ -1,0 +1,13 @@
+{
+	"name": "chatping-relay",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Dumb WebSocket broadcast relay for the Chat Ping Minecraft mod.",
+	"main": "server.js",
+	"scripts": {
+		"start": "node server.js"
+	},
+	"dependencies": {
+		"ws": "^8.18.0"
+	}
+}

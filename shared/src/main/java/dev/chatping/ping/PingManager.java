@@ -1,5 +1,7 @@
 package dev.chatping.ping;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import com.mojang.authlib.GameProfile;
 import dev.chatping.config.ChatPingConfig;
 import dev.chatping.config.ChatPingConfigRoot;
@@ -22,6 +24,7 @@ public final class PingManager {
 	public record Ping(BlockPos pos, String senderName, long createdAtMs) {}
 
 	private static final List<Ping> ACTIVE = new ArrayList<>();
+	private static final Gson GSON = new Gson();
 	private static long lastPingAtMs = 0L;
 
 	private static ChatPingConfig config() {
@@ -34,6 +37,18 @@ public final class PingManager {
 		long now = System.currentTimeMillis();
 		ACTIVE.removeIf(p -> now - p.createdAtMs() > lifetimeMs);
 		return ACTIVE;
+	}
+
+	/**
+	 * Call every client tick: keeps the relay connection alive so pings from other
+	 * players still arrive even if this player never places one themselves. Cheap when
+	 * already connected — see {@link RelayClient#ensureConnected}.
+	 */
+	public static void maintainRelayConnection() {
+		ChatPingConfig config = config();
+		if (config.transportMode != ChatPingConfig.TransportMode.CHAT_ONLY) {
+			RelayClient.ensureConnected(config.relayServerUrl);
+		}
 	}
 
 	public static void registerChatListener() {
@@ -89,6 +104,19 @@ public final class PingManager {
 		return !config().hidePingChatLine;
 	}
 
+	/** Called by {@link RelayClient} when a message arrives over the WebSocket relay. */
+	static void handleRelayMessage(String json) {
+		try {
+			RelayPing ping = GSON.fromJson(json, RelayPing.class);
+			if (ping == null || ping.sender() == null) {
+				return;
+			}
+			ACTIVE.add(new Ping(new BlockPos(ping.x(), ping.y(), ping.z()), ping.sender(), System.currentTimeMillis()));
+		} catch (JsonParseException e) {
+			// Malformed relay payload — ignore rather than crash the listener thread.
+		}
+	}
+
 	/**
 	 * Best-effort sender name when there's no GameProfile: scans backwards from "Ping at"
 	 * for the first token that has a letter or digit in it, skipping decorative separator
@@ -131,9 +159,34 @@ public final class PingManager {
 		BlockPos pos = blockHit.getBlockPos();
 		String selfName = player.getName().getString();
 
-		// Shown instantly, before the server echo arrives — see onChatMessage's self-dedup.
+		// Shown instantly, before any transport round-trip — see onChatMessage's self-dedup
+		// for chat, and the relay server's own skip-the-sender behavior for RelayClient.
 		ACTIVE.add(new Ping(pos, selfName, now));
 
-		client.player.networkHandler.sendChatMessage(PingCodec.encode(new PingPayload(pos.getX(), pos.getY(), pos.getZ())));
+		sendPing(client, pos, selfName, config.transportMode);
+	}
+
+	private static void sendPing(MinecraftClient client, BlockPos pos, String selfName, ChatPingConfig.TransportMode mode) {
+		if (mode != ChatPingConfig.TransportMode.CHAT_ONLY) {
+			RelayClient.ensureConnected(config().relayServerUrl);
+		}
+		boolean relayReady = mode != ChatPingConfig.TransportMode.CHAT_ONLY && RelayClient.isConnected();
+
+		switch (mode) {
+			case RELAY_ONLY -> {
+				if (relayReady) {
+					RelayClient.send(GSON.toJson(new RelayPing(pos.getX(), pos.getY(), pos.getZ(), selfName)));
+				}
+				// Not connected and relay-only: stay silent rather than risk a chat mute.
+			}
+			case RELAY_PREFERRED_CHAT_FALLBACK -> {
+				if (relayReady) {
+					RelayClient.send(GSON.toJson(new RelayPing(pos.getX(), pos.getY(), pos.getZ(), selfName)));
+				} else {
+					client.player.networkHandler.sendChatMessage(PingCodec.encode(new PingPayload(pos.getX(), pos.getY(), pos.getZ())));
+				}
+			}
+			case CHAT_ONLY -> client.player.networkHandler.sendChatMessage(PingCodec.encode(new PingPayload(pos.getX(), pos.getY(), pos.getZ())));
+		}
 	}
 }

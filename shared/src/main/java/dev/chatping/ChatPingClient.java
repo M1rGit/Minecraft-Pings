@@ -28,6 +28,7 @@ public class ChatPingClient implements ClientModInitializer {
 			while (placePingKey.wasPressed()) {
 				PingManager.tryPlacePing(client);
 			}
+			PingManager.maintainRelayConnection();
 		});
 	}
 }

@@ -17,6 +17,8 @@
 	"text.autoconfig.chatping.option.general.dotSizePercent": "Жирность точки (%)",
 	"text.autoconfig.chatping.option.general.labelScalePercent": "Размер текста подписи (%)",
 	"text.autoconfig.chatping.option.general.renderMode": "Стиль метки",
+	"text.autoconfig.chatping.option.general.transportMode": "Способ отправки пинга",
+	"text.autoconfig.chatping.option.general.relayServerUrl": "Адрес relay-сервера (ws://host:port)",
 
 	"text.autoconfig.chatping.option.players": "Цвета игроков",
 	"text.autoconfig.chatping.option.players.entries": "Цвета по игрокам",
