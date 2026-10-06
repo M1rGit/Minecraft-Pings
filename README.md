@@ -8,19 +8,45 @@
 эксплойта/флуда. См. `ТЗ.md` для полного описания и `dev.chatping.ping.PingCodec`
 для формата.
 
+## Структура проекта
+
+Мультиверсионная сборка — две Minecraft-версии, общий код:
+
+```
+shared/           — весь код и ресурсы, не зависящие от версии рендера
+                    (ChatPingClient, ping/*, config/*, lang-файлы, иконка)
+versions/1.21.1/  — старый рендер (Tessellator.begin + BufferRenderer)
+versions/1.21.11/ — новый рендер под переписанный с 1.21.9 GPU-пайплайн
+                    (RenderPipeline + ручной upload в RenderPass)
+gradle/shared-mod.gradle — общая Gradle-логика (зависимости, publishing и т.д.),
+                    подключается обоими подпроектами
+```
+
+Каждый подпроект — обычный Fabric Loom проект, у него своя `gradle.properties`
+(minecraft/yarn/loader/fabric-api/cloth-config/mod-menu версии) и свой
+`PingRenderer.java` — единственный файл, который реально отличается между версиями.
+
 ## Сборка
 
 ```
 ./gradlew build
 ```
 
-Собранный jar — в `build/libs/`.
+Собирает обе версии разом. Jar'ы — в `versions/1.21.1/build/libs/` и
+`versions/1.21.11/build/libs/`. Собрать только одну версию:
+
+```
+./gradlew :versions:1.21.1:build
+./gradlew :versions:1.21.11:build
+```
 
 ## Текущий статус
 
-MVP под Minecraft 1.21.1 (Fabric, Yarn mappings). Поддержка диапазона 1.21.1–1.21.11
-через Stonecutter — следующий шаг, после проверки, что ядро (raycast → кодирование →
-рендер) работает в игре.
+Ядро (raycast → кодирование → парсинг чата → рендер → конфиг) проверено на реальном
+сервере под 1.21.1. Порт под 1.21.11 (`versions/1.21.11/.../PingRenderer.java`) написан
+по сверенным через Yarn-документацию именам классов/методов, но **не компилировался** —
+новый рендер-пайплайн (GpuDevice/RenderPass/RenderPipeline) появился очень недавно
+(конец 2025), это самый рискованный файл в проекте, вероятны правки после первой сборки.
 
 ## Лицензия
 

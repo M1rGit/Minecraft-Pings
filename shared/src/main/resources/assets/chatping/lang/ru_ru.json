@@ -1,0 +1,26 @@
+{
+	"key.chatping.place_ping": "Поставить метку",
+	"category.chatping": "Chat Ping",
+	"key.categories.chatping.main": "Chat Ping",
+	"chatping.main": "Chat Ping",
+	"text.autoconfig.chatping.title": "Настройки Chat Ping",
+	"text.autoconfig.chatping.category.general": "Общие",
+	"text.autoconfig.chatping.category.players": "Цвета игроков",
+
+	"text.autoconfig.chatping.option.general": "Общие",
+	"text.autoconfig.chatping.option.general.raycastDistance": "Дистанция raycast (блоки)",
+	"text.autoconfig.chatping.option.general.markerLifetimeSeconds": "Время жизни метки (сек)",
+	"text.autoconfig.chatping.option.general.pingCooldownMillis": "Кулдаун метки (мс)",
+	"text.autoconfig.chatping.option.general.hidePingChatLine": "Скрывать строку пинга в чате",
+	"text.autoconfig.chatping.option.general.showDistanceInLabel": "Показывать дистанцию в подписи",
+	"text.autoconfig.chatping.option.general.markerColor": "Цвет метки",
+	"text.autoconfig.chatping.option.general.dotSizePercent": "Жирность точки (%)",
+	"text.autoconfig.chatping.option.general.labelScalePercent": "Размер текста подписи (%)",
+	"text.autoconfig.chatping.option.general.renderMode": "Стиль метки",
+
+	"text.autoconfig.chatping.option.players": "Цвета игроков",
+	"text.autoconfig.chatping.option.players.entries": "Цвета по игрокам",
+	"text.autoconfig.chatping.option.Entry": "Игрок",
+	"text.autoconfig.chatping.option.Entry.playerName": "Ник игрока",
+	"text.autoconfig.chatping.option.Entry.color": "Цвет"
+}

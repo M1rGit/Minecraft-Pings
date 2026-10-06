@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "chatping",
+	"version": "${version}",
+	"name": "Chat Ping",
+	"description": "World-space ping markers transported over normal chat messages — no server mod required.",
+	"authors": [
+		"m1notaurgeneral"
+	],
+	"license": "MIT",
+	"icon": "assets/chatping/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.chatping.ChatPingClient"
+		],
+		"modmenu": [
+			"dev.chatping.config.ChatPingModMenuIntegration"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*",
+		"cloth-config": "*"
+	}
+}

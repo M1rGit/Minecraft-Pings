@@ -9,5 +9,7 @@ pluginManagement {
 	}
 }
 
-// Should match your modid
 rootProject.name = 'chatping'
+
+include 'versions:1.21.1'
+include 'versions:1.21.11'
