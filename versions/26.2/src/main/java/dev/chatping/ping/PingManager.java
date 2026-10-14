@@ -1,0 +1,191 @@
+package dev.chatping.ping;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
+import com.mojang.authlib.GameProfile;
+import dev.chatping.config.ChatPingConfig;
+import dev.chatping.config.ChatPingConfigRoot;
+import me.shedaniel.autoconfig.AutoConfig;
+import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/** Owns the active ping list, places pings locally, and parses them out of incoming chat. */
+public final class PingManager {
+	private PingManager() {}
+
+	public record Ping(BlockPos pos, String senderName, long createdAtMs) {}
+
+	private static final List<Ping> ACTIVE = new ArrayList<>();
+	private static final Gson GSON = new Gson();
+	private static long lastPingAtMs = 0L;
+
+	private static ChatPingConfig config() {
+		return AutoConfig.getConfigHolder(ChatPingConfigRoot.class).getConfig().general;
+	}
+
+	/** Pings still alive, right-sized for the renderer to iterate every frame. */
+	public static List<Ping> activePings() {
+		long lifetimeMs = config().markerLifetimeSeconds * 1000L;
+		long now = System.currentTimeMillis();
+		ACTIVE.removeIf(p -> now - p.createdAtMs() > lifetimeMs);
+		return ACTIVE;
+	}
+
+	/**
+	 * Call every client tick: keeps the relay connection alive so pings from other
+	 * players still arrive even if this player never places one themselves. Cheap when
+	 * already connected — see {@link RelayClient#ensureConnected}.
+	 */
+	public static void maintainRelayConnection() {
+		ChatPingConfig config = config();
+		if (config.transportMode != ChatPingConfig.TransportMode.CHAT_ONLY) {
+			RelayClient.ensureConnected(config.relayServerUrl);
+		}
+	}
+
+	public static void registerChatListener() {
+		ClientReceiveMessageEvents.ALLOW_CHAT.register(PingManager::onChatMessage);
+		// Some servers (chat-formatting plugins, BedWars-style lobbies) broadcast player chat
+		// as a server/system message instead of real signed player chat, so ALLOW_CHAT never
+		// fires for it. Catch that path too — with no GameProfile, we fall back to guessing
+		// the sender's name out of the text itself.
+		ClientReceiveMessageEvents.ALLOW_GAME.register(PingManager::onGameMessage);
+	}
+
+	private static boolean onChatMessage(net.minecraft.network.chat.Component message, net.minecraft.network.chat.PlayerChatMessage signedMessage,
+			GameProfile sender, net.minecraft.network.chat.ChatType.Bound params, java.time.Instant receptionTimestamp) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			return true;
+		}
+		// Unsigned ("Not Secure") chat — e.g. ely.by / alt-auth accounts — has no SignedMessage,
+		// so fall back to the decorated Text; our pattern isn't anchored, so it still finds the
+		// coordinates even with a sender name or "[Not Secure]" mixed into the same string.
+		String rawContent = signedMessage != null ? signedMessage.decoratedContent().getString() : message.getString();
+		return handleIncoming(rawContent, sender, client);
+	}
+
+	private static boolean onGameMessage(net.minecraft.network.chat.Component message, boolean overlay) {
+		if (overlay) {
+			return true; // action bar text, not chat
+		}
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null) {
+			return true;
+		}
+		return handleIncoming(message.getString(), null, client);
+	}
+
+	private static boolean handleIncoming(String rawContent, GameProfile sender, Minecraft client) {
+		Optional<PingPayload> decoded = PingCodec.decode(rawContent);
+		if (decoded.isEmpty()) {
+			return true;
+		}
+
+		// No GameProfile (system-message path) — fall back to spotting our own name in the text.
+		boolean isSelf = sender != null
+				? GameProfileCompat.id(sender).equals(client.player.getUUID())
+				: rawContent.contains(client.player.getName().getString());
+
+		if (!isSelf) {
+			PingPayload payload = decoded.get();
+			String name = sender != null ? GameProfileCompat.name(sender) : guessSenderName(rawContent);
+			ACTIVE.add(new Ping(new BlockPos(payload.x(), payload.y(), payload.z()), name, System.currentTimeMillis()));
+		}
+
+		return !config().hidePingChatLine;
+	}
+
+	/** Called by {@link RelayClient} when a message arrives over the WebSocket relay. */
+	static void handleRelayMessage(String json) {
+		try {
+			RelayPing ping = GSON.fromJson(json, RelayPing.class);
+			if (ping == null || ping.sender() == null) {
+				return;
+			}
+			ACTIVE.add(new Ping(new BlockPos(ping.x(), ping.y(), ping.z()), ping.sender(), System.currentTimeMillis()));
+		} catch (JsonParseException e) {
+			// Malformed relay payload — ignore rather than crash the listener thread.
+		}
+	}
+
+	/**
+	 * Best-effort sender name when there's no GameProfile: scans backwards from "Ping at"
+	 * for the first token that has a letter or digit in it, skipping decorative separator
+	 * glyphs some servers insert right before the message (e.g. a custom arrow icon) —
+	 * those render as missing-glyph junk if picked as the "name".
+	 */
+	private static String guessSenderName(String rawContent) {
+		String before = rawContent.split("Ping at", 2)[0];
+		String cleaned = before.replaceAll("[\\[\\]()»:>\\-]+", " ").trim();
+		if (cleaned.isEmpty()) {
+			return "???";
+		}
+		String[] tokens = cleaned.split("\\s+");
+		for (int i = tokens.length - 1; i >= 0; i--) {
+			if (tokens[i].chars().anyMatch(Character::isLetterOrDigit)) {
+				return tokens[i];
+			}
+		}
+		return "???";
+	}
+
+	public static void tryPlacePing(Minecraft client) {
+		LocalPlayer player = client.player;
+		if (player == null) {
+			return;
+		}
+
+		ChatPingConfig config = config();
+		long now = System.currentTimeMillis();
+		if (now - lastPingAtMs < config.pingCooldownMillis) {
+			return;
+		}
+
+		HitResult hit = player.pick(config.raycastDistance, 1.0F, false);
+		if (hit.getType() != HitResult.Type.BLOCK || !(hit instanceof BlockHitResult blockHit)) {
+			return;
+		}
+		lastPingAtMs = now;
+
+		BlockPos pos = blockHit.getBlockPos();
+		String selfName = player.getName().getString();
+
+		// Shown instantly, before any transport round-trip — see onChatMessage's self-dedup
+		// for chat, and the relay server's own skip-the-sender behavior for RelayClient.
+		ACTIVE.add(new Ping(pos, selfName, now));
+
+		sendPing(client, pos, selfName, config.transportMode);
+	}
+
+	private static void sendPing(Minecraft client, BlockPos pos, String selfName, ChatPingConfig.TransportMode mode) {
+		if (mode != ChatPingConfig.TransportMode.CHAT_ONLY) {
+			RelayClient.ensureConnected(config().relayServerUrl);
+		}
+		boolean relayReady = mode != ChatPingConfig.TransportMode.CHAT_ONLY && RelayClient.isConnected();
+
+		switch (mode) {
+			case RELAY_ONLY -> {
+				if (relayReady) {
+					RelayClient.send(GSON.toJson(new RelayPing(pos.getX(), pos.getY(), pos.getZ(), selfName)));
+				}
+				// Not connected and relay-only: stay silent rather than risk a chat mute.
+			}
+			case RELAY_PREFERRED_CHAT_FALLBACK -> {
+				if (relayReady) {
+					RelayClient.send(GSON.toJson(new RelayPing(pos.getX(), pos.getY(), pos.getZ(), selfName)));
+				} else {
+					client.player.connection.sendChat(PingCodec.encode(new PingPayload(pos.getX(), pos.getY(), pos.getZ())));
+				}
+			}
+			case CHAT_ONLY -> client.player.connection.sendChat(PingCodec.encode(new PingPayload(pos.getX(), pos.getY(), pos.getZ())));
+		}
+	}
+}

@@ -1,0 +1,82 @@
+// Minecraft 26.1+ ships unobfuscated — Fabric's new no-remap plugin skips all
+// remapping entirely, so this subproject can't reuse gradle/shared-mod.gradle
+// (that one is built around modImplementation/remapJar, which don't exist here).
+// Its Java source also can't reuse /shared directly: that tree is written against
+// Yarn names, which don't exist post-26.1. This subproject carries its own full
+// copy of the source, migrated via Loom's migrateMappings task from versions/1.21.11.
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+repositories {
+	maven { name = 'Shedaniel'; url = 'https://maven.shedaniel.me/' }
+	maven { name = 'TerraformersMC'; url = 'https://maven.terraformersmc.com/releases/' }
+}
+
+// Lang files and the icon aren't mapping-dependent — share them with /shared. Java
+// source is NOT shared here: that tree uses Yarn names, which don't exist post-26.1.
+sourceSets {
+	main {
+		resources { srcDir rootProject.file('shared/src/main/resources') }
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	// No `mappings` line: this version ships unobfuscated, there's nothing to map.
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Config screen — required dependency, same as Fabric API; not bundled.
+	implementation "me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}"
+
+	// Mod Menu entry point — optional, only used if the player already has it installed.
+	compileOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
+	localRuntime "com.terraformersmc:modmenu:${project.mod_menu_version}"
+}
+
+processResources {
+	def modVersion = rootProject.property('mod_version')
+	inputs.property "version", modVersion
+	filesMatching("fabric.mod.json") {
+		expand "version": modVersion
+	}
+}
+
+// Minecraft 26.x's own toolchain moved to Java 25 (independent of the mappings change) —
+// Cloth Config/Mod Menu builds for this version are compiled against it, so our bytecode
+// target has to match or dependency resolution rejects them as "needs JVM 25+".
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+def projectNameForJar = project.name
+jar {
+	from(rootProject.file("LICENSE")) {
+		rename { "${it}_${projectNameForJar}" }
+	}
+}
+
+base {
+	archivesName = "chatping-mc${project.minecraft_version}"
+}
+version = rootProject.property('mod_version')
+group = rootProject.property('mod_group')
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+	repositories {
+		// Add repositories to publish to here.
+	}
+}

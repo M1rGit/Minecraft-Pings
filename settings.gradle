@@ -13,3 +13,4 @@ rootProject.name = 'chatping'
 
 include 'versions:1.21.1'
 include 'versions:1.21.11'
+include 'versions:26.2'
